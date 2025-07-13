@@ -1,0 +1,44 @@
+version: '3.8'
+
+volumes:
+  postgres_auth_volume:
+  postgres_chat_volume:
+
+services:
+  auth-db:
+    image: postgres:14-alpine3.17
+    container_name: auth-db
+    env_file:
+      - docker-compose.env
+    environment:
+      - POSTGRES_DB=${AUTH_POSTGRES_DB}
+      - POSTGRES_USER=${AUTH_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${AUTH_POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_auth_volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_POSTGRES_USER} -d ${AUTH_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chat-db:
+    image: postgres:14-alpine3.17
+    container_name: chat-db
+    env_file:
+      - docker-compose.env
+    environment:
+      - POSTGRES_DB=${CHAT_POSTGRES_DB}
+      - POSTGRES_USER=${CHAT_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${CHAT_POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_chat_volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CHAT_POSTGRES_USER} -d ${CHAT_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5 

@@ -1,3 +1,7 @@
 .idea
 /auth/bin/
 /chat_server/bin/
+
+auth/.env
+chat_server/.env
+docker-compose.env
