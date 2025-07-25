@@ -23,9 +23,9 @@ func NewConfig() *Config {
 	return &Config{
 		Host:     getEnv("PG_HOST", "localhost"),
 		Port:     getEnv("PG_PORT", "5432"),
-		User:     getEnv("PG_USER", "postgres"),
-		Password: getEnv("PG_PASSWORD", "postgres"),
-		DBName:   getEnv("PG_DATABASE_NAME", "auth"),
+		User:     getEnv("AUTH_POSTGRES_USER", "auth_user"),
+		Password: getEnv("AUTH_POSTGRES_PASSWORD", "auth_password"),
+		DBName:   getEnv("AUTH_POSTGRES_DB", "auth"),
 		SSLMode:  getEnv("PG_SSLMODE", "disable"),
 	}
 }

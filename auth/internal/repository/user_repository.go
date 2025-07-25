@@ -9,18 +9,26 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	desc "chat/auth/pkg/user_v1"
+	"chat/auth/internal/model"
 )
 
-type UserRepository struct {
+type UserRepository interface {
+	Create(ctx context.Context, info *model.UserInfo) (int64, error)
+	Get(ctx context.Context, id int64) (*model.User, error)
+	Update(ctx context.Context, user *model.UserUpdate) error
+	Delete(ctx context.Context, id int64) error
+	GetByEmail(ctx context.Context, email string) (*model.User, error)
+}
+
+type userRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
-	return &UserRepository{pool: pool}
+func NewUserRepository(pool *pgxpool.Pool) UserRepository {
+	return &userRepository{pool: pool}
 }
 
-func (r *UserRepository) Create(ctx context.Context, info *desc.UserInfo, passwordHash string) (int64, error) {
+func (r *userRepository) Create(ctx context.Context, info *model.UserInfo) (int64, error) {
 	query := `
 		INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $5)
@@ -32,8 +40,8 @@ func (r *UserRepository) Create(ctx context.Context, info *desc.UserInfo, passwo
 	err := r.pool.QueryRow(ctx, query,
 		info.Name,
 		info.Email,
-		passwordHash,
-		info.Role.String(),
+		info.Password,
+		info.Role,
 		now,
 	).Scan(&id)
 	if err != nil {
@@ -42,7 +50,7 @@ func (r *UserRepository) Create(ctx context.Context, info *desc.UserInfo, passwo
 	return id, nil
 }
 
-func (r *UserRepository) Get(ctx context.Context, id int64) (*desc.User, error) {
+func (r *userRepository) Get(ctx context.Context, id int64) (*model.User, error) {
 	query := `
 		SELECT id, name, email, password_hash, role, created_at, updated_at
 		FROM users
@@ -50,11 +58,11 @@ func (r *UserRepository) Get(ctx context.Context, id int64) (*desc.User, error) 
 
 	row := r.pool.QueryRow(ctx, query, id)
 
-	var user desc.User
+	var user model.User
 	var name, email, passwordHash, roleStr string
 	var createdAt, updatedAt time.Time
 
-	err := row.Scan(&user.Id, &name, &email, &passwordHash, &roleStr, &createdAt, &updatedAt)
+	err := row.Scan(&user.ID, &name, &email, &passwordHash, &roleStr, &createdAt, &updatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found: %w", err)
@@ -62,51 +70,29 @@ func (r *UserRepository) Get(ctx context.Context, id int64) (*desc.User, error) 
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	var role desc.Role
-	switch roleStr {
-	case "USER":
-		role = desc.Role_USER
-	case "ADMIN":
-		role = desc.Role_ADMIN
-	default:
-		role = desc.Role_USER
-	}
-
-	user.Info = &desc.UserInfo{Name: name, Email: email, Role: role}
+	user.Info = &model.UserInfo{Name: name, Email: email, Role: roleStr}
 	user.CreatedAt = timestamppb.New(createdAt)
 	user.UpdatedAt = timestamppb.New(updatedAt)
 	return &user, nil
 }
 
-func (r *UserRepository) Update(ctx context.Context, id int64, info *desc.UpdateUserInfo) error {
+func (r *userRepository) Update(ctx context.Context, user *model.UserUpdate) error {
 	query := `
 		UPDATE users
 		SET name = COALESCE($2, name),
 		    email = COALESCE($3, email),
-		    updated_at = $4
+		    role = COALESCE($4, role),
+		    updated_at = $5
 		WHERE id = $1`
 
-	var name, email *string
-	if info.Name != nil {
-		v := info.Name.GetValue()
-		name = &v
-	}
-	if info.Email != nil {
-		v := info.Email.GetValue()
-		email = &v
-	}
-
-	ct, err := r.pool.Exec(ctx, query, id, name, email, time.Now())
+	_, err := r.pool.Exec(ctx, query, user.ID, user.Info.Name, user.Info.Email, user.Info.Role, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
-	}
-	if ct.RowsAffected() == 0 {
-		return fmt.Errorf("user not found")
 	}
 	return nil
 }
 
-func (r *UserRepository) Delete(ctx context.Context, id int64) error {
+func (r *userRepository) Delete(ctx context.Context, id int64) error {
 	cmd, err := r.pool.Exec(ctx, `DELETE FROM users WHERE id=$1`, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
@@ -117,7 +103,7 @@ func (r *UserRepository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*desc.User, error) {
+func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	query := `
 		SELECT id, name, email, password_hash, role, created_at, updated_at
 		FROM users
@@ -125,11 +111,11 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*desc.Us
 
 	row := r.pool.QueryRow(ctx, query, email)
 
-	var user desc.User
+	var user model.User
 	var name, passwordHash, roleStr string
 	var createdAt, updatedAt time.Time
 
-	err := row.Scan(&user.Id, &name, &email, &passwordHash, &roleStr, &createdAt, &updatedAt)
+	err := row.Scan(&user.ID, &name, &email, &passwordHash, &roleStr, &createdAt, &updatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found: %w", err)
@@ -137,17 +123,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*desc.Us
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
-	var role desc.Role
-	switch roleStr {
-	case "USER":
-		role = desc.Role_USER
-	case "ADMIN":
-		role = desc.Role_ADMIN
-	default:
-		role = desc.Role_USER
-	}
-
-	user.Info = &desc.UserInfo{Name: name, Email: email, Role: role}
+	user.Info = &model.UserInfo{Name: name, Email: email, Role: roleStr}
 	user.CreatedAt = timestamppb.New(createdAt)
 	user.UpdatedAt = timestamppb.New(updatedAt)
 	return &user, nil

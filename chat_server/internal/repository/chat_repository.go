@@ -9,15 +9,23 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-type ChatRepository struct {
+type ChatRepository interface {
+	CreateChat(ctx context.Context, usernames []string) (int64, error)
+	DeleteChat(ctx context.Context, chatID int64) error
+	SendMessage(ctx context.Context, fromUser, text string, ts time.Time) error
+	GetChatUsers(ctx context.Context, chatID int64) ([]string, error)
+	ChatExists(ctx context.Context, chatID int64) (bool, error)
+}
+
+type chatRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewChatRepository(pool *pgxpool.Pool) *ChatRepository {
-	return &ChatRepository{pool: pool}
+func NewChatRepository(pool *pgxpool.Pool) ChatRepository {
+	return &chatRepository{pool: pool}
 }
 
-func (r *ChatRepository) CreateChat(ctx context.Context, usernames []string) (int64, error) {
+func (r *chatRepository) CreateChat(ctx context.Context, usernames []string) (int64, error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("begin tx: %w", err)
@@ -41,7 +49,7 @@ func (r *ChatRepository) CreateChat(ctx context.Context, usernames []string) (in
 	return chatID, nil
 }
 
-func (r *ChatRepository) DeleteChat(ctx context.Context, chatID int64) error {
+func (r *chatRepository) DeleteChat(ctx context.Context, chatID int64) error {
 	cmd, err := r.pool.Exec(ctx, `DELETE FROM chats WHERE id=$1`, chatID)
 	if err != nil {
 		return fmt.Errorf("delete chat: %w", err)
@@ -52,7 +60,7 @@ func (r *ChatRepository) DeleteChat(ctx context.Context, chatID int64) error {
 	return nil
 }
 
-func (r *ChatRepository) SendMessage(ctx context.Context, fromUser, text string, ts time.Time) error {
+func (r *chatRepository) SendMessage(ctx context.Context, fromUser, text string, ts time.Time) error {
 	_, err := r.pool.Exec(ctx, `INSERT INTO messages (chat_id, from_user, text, timestamp, created_at) VALUES ($1,$2,$3,$4,$5)`, 1, fromUser, text, ts, time.Now())
 	if err != nil {
 		return fmt.Errorf("insert message: %w", err)
@@ -60,7 +68,7 @@ func (r *ChatRepository) SendMessage(ctx context.Context, fromUser, text string,
 	return nil
 }
 
-func (r *ChatRepository) GetChatUsers(ctx context.Context, chatID int64) ([]string, error) {
+func (r *chatRepository) GetChatUsers(ctx context.Context, chatID int64) ([]string, error) {
 	rows, err := r.pool.Query(ctx, `SELECT username FROM chat_users WHERE chat_id=$1 ORDER BY created_at`, chatID)
 	if err != nil {
 		return nil, fmt.Errorf("query users: %w", err)
@@ -77,7 +85,7 @@ func (r *ChatRepository) GetChatUsers(ctx context.Context, chatID int64) ([]stri
 	return res, nil
 }
 
-func (r *ChatRepository) ChatExists(ctx context.Context, chatID int64) (bool, error) {
+func (r *chatRepository) ChatExists(ctx context.Context, chatID int64) (bool, error) {
 	var exists bool
 	if err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM chats WHERE id=$1)`, chatID).Scan(&exists); err != nil {
 		return false, fmt.Errorf("exists: %w", err)

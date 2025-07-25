@@ -39,4 +39,4 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${CHAT_POSTGRES_USER} -d ${CHAT_POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 5 
+      retries: 5

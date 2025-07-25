@@ -6,59 +6,59 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"chat/auth/internal/model"
 	"chat/auth/internal/repository"
-	desc "chat/auth/pkg/user_v1"
 )
 
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo repository.UserRepository
 }
 
-func NewUserService(userRepo *repository.UserRepository) *UserService {
+func NewUserService(userRepo repository.UserRepository) *UserService {
 	return &UserService{
 		userRepo: userRepo,
 	}
 }
 
-func (s *UserService) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+func (s *UserService) Create(ctx context.Context, userCreate *model.UserCreate) (int64, error) {
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(userCreate.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", err)
+		return 0, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	id, err := s.userRepo.Create(ctx, req.Info, string(passwordHash))
+	userCreate.Info.Password = string(passwordHash)
+
+	id, err := s.userRepo.Create(ctx, userCreate.Info)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return 0, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	return &desc.CreateResponse{Id: id}, nil
+	return id, nil
 }
 
-func (s *UserService) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
-	user, err := s.userRepo.Get(ctx, req.Id)
+func (s *UserService) Get(ctx context.Context, id int64) (*model.User, error) {
+	user, err := s.userRepo.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return &desc.GetResponse{
-		User: user,
-	}, nil
+	return user, nil
 }
 
-func (s *UserService) Update(ctx context.Context, req *desc.UpdateRequest) error {
-	_, err := s.userRepo.Get(ctx, req.Id)
+func (s *UserService) Update(ctx context.Context, userUpdate *model.UserUpdate) error {
+	_, err := s.userRepo.Get(ctx, userUpdate.ID)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
 
-	if req.Info.Email != nil {
-		existingUser, err := s.userRepo.GetByEmail(ctx, req.Info.Email.GetValue())
-		if err == nil && existingUser.Id != req.Id {
+	if userUpdate.Info.Email != "" {
+		existingUser, err := s.userRepo.GetByEmail(ctx, userUpdate.Info.Email)
+		if err == nil && existingUser.ID != userUpdate.ID {
 			return fmt.Errorf("email is already taken by another user")
 		}
 	}
 
-	err = s.userRepo.Update(ctx, req.Id, req.Info)
+	err = s.userRepo.Update(ctx, userUpdate)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
@@ -66,8 +66,8 @@ func (s *UserService) Update(ctx context.Context, req *desc.UpdateRequest) error
 	return nil
 }
 
-func (s *UserService) Delete(ctx context.Context, req *desc.DeleteRequest) error {
-	err := s.userRepo.Delete(ctx, req.Id)
+func (s *UserService) Delete(ctx context.Context, id int64) error {
+	err := s.userRepo.Delete(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
