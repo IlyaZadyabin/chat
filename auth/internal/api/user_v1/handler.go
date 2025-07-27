@@ -14,10 +14,10 @@ import (
 
 type UserV1Handler struct {
 	desc.UnimplementedUserV1Server
-	userService service.UserService
+	userService *service.UserService
 }
 
-func NewUserV1Handler(userService service.UserService) *UserV1Handler {
+func NewUserV1Handler(userService *service.UserService) *UserV1Handler {
 	return &UserV1Handler{
 		userService: userService,
 	}
