@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"chat/auth/internal/model"
+	"chat/pkg/database/client"
 )
 
 type UserRepository interface {
@@ -21,23 +21,26 @@ type UserRepository interface {
 }
 
 type userRepository struct {
-	pool *pgxpool.Pool
+	db client.Client
 }
 
-func NewUserRepository(pool *pgxpool.Pool) UserRepository {
-	return &userRepository{pool: pool}
+func NewUserRepository(db client.Client) UserRepository {
+	return &userRepository{db: db}
 }
 
 func (r *userRepository) Create(ctx context.Context, info *model.UserInfo) (int64, error) {
-	query := `
-		INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $5)
-		RETURNING id`
+	q := client.Query{
+		Name: "user_repository.Create",
+		QueryRaw: `
+			INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $5)
+			RETURNING id`,
+	}
 
 	now := time.Now()
 
 	var id int64
-	err := r.pool.QueryRow(ctx, query,
+	err := r.db.DB().QueryRowContext(ctx, q,
 		info.Name,
 		info.Email,
 		info.Password,
@@ -51,12 +54,15 @@ func (r *userRepository) Create(ctx context.Context, info *model.UserInfo) (int6
 }
 
 func (r *userRepository) Get(ctx context.Context, id int64) (*model.User, error) {
-	query := `
-		SELECT id, name, email, password_hash, role, created_at, updated_at
-		FROM users
-		WHERE id = $1`
+	q := client.Query{
+		Name: "user_repository.Get",
+		QueryRaw: `
+			SELECT id, name, email, password_hash, role, created_at, updated_at
+			FROM users
+			WHERE id = $1`,
+	}
 
-	row := r.pool.QueryRow(ctx, query, id)
+	row := r.db.DB().QueryRowContext(ctx, q, id)
 
 	var user model.User
 	var name, email, passwordHash, roleStr string
@@ -77,15 +83,18 @@ func (r *userRepository) Get(ctx context.Context, id int64) (*model.User, error)
 }
 
 func (r *userRepository) Update(ctx context.Context, user *model.UserUpdate) error {
-	query := `
-		UPDATE users
-		SET name = COALESCE($2, name),
-		    email = COALESCE($3, email),
-		    role = COALESCE($4, role),
-		    updated_at = $5
-		WHERE id = $1`
+	q := client.Query{
+		Name: "user_repository.Update",
+		QueryRaw: `
+			UPDATE users
+			SET name = COALESCE($2, name),
+			    email = COALESCE($3, email),
+			    role = COALESCE($4, role),
+			    updated_at = $5
+			WHERE id = $1`,
+	}
 
-	_, err := r.pool.Exec(ctx, query, user.ID, user.Info.Name, user.Info.Email, user.Info.Role, time.Now())
+	_, err := r.db.DB().ExecContext(ctx, q, user.ID, user.Info.Name, user.Info.Email, user.Info.Role, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
@@ -93,7 +102,12 @@ func (r *userRepository) Update(ctx context.Context, user *model.UserUpdate) err
 }
 
 func (r *userRepository) Delete(ctx context.Context, id int64) error {
-	cmd, err := r.pool.Exec(ctx, `DELETE FROM users WHERE id=$1`, id)
+	q := client.Query{
+		Name:     "user_repository.Delete",
+		QueryRaw: `DELETE FROM users WHERE id=$1`,
+	}
+
+	cmd, err := r.db.DB().ExecContext(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
@@ -104,12 +118,15 @@ func (r *userRepository) Delete(ctx context.Context, id int64) error {
 }
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	query := `
-		SELECT id, name, email, password_hash, role, created_at, updated_at
-		FROM users
-		WHERE email = $1`
+	q := client.Query{
+		Name: "user_repository.GetByEmail",
+		QueryRaw: `
+			SELECT id, name, email, password_hash, role, created_at, updated_at
+			FROM users
+			WHERE email = $1`,
+	}
 
-	row := r.pool.QueryRow(ctx, query, email)
+	row := r.db.DB().QueryRowContext(ctx, q, email)
 
 	var user model.User
 	var name, passwordHash, roleStr string

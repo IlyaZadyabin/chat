@@ -24,8 +24,8 @@ func main() {
 
 	serviceProvider := app.NewServiceProvider()
 
-	dbPool := serviceProvider.GetDbPool(context.Background())
-	defer dbPool.Close()
+	dbClient := serviceProvider.GetDbClient(context.Background())
+	defer dbClient.Close()
 
 	userHandler := serviceProvider.GetUserHandler(context.Background())
 

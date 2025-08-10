@@ -9,13 +9,17 @@ import (
 	"chat/auth/internal/database"
 	"chat/auth/internal/repository"
 	"chat/auth/internal/service"
-
-	"github.com/jackc/pgx/v4/pgxpool"
+	"chat/pkg/database/client"
+	"chat/pkg/database/pg"
+	"chat/pkg/database/transaction"
 )
 
 type ServiceProvider struct {
-	dbOnce sync.Once
-	dbPool *pgxpool.Pool
+	dbClientOnce sync.Once
+	dbClient     client.Client
+
+	txManagerOnce sync.Once
+	txManager     client.TxManager
 
 	userRepositoryOnce sync.Once
 	userRepository     repository.UserRepository
@@ -31,20 +35,28 @@ func NewServiceProvider() *ServiceProvider {
 	return &ServiceProvider{}
 }
 
-func (s *ServiceProvider) GetDbPool(ctx context.Context) *pgxpool.Pool {
-	s.dbOnce.Do(func() {
-		var err error
-		s.dbPool, err = database.NewConnection(database.NewConfig())
+func (s *ServiceProvider) GetDbClient(ctx context.Context) client.Client {
+	s.dbClientOnce.Do(func() {
+		cfg := database.NewConfig()
+		dbClient, err := pg.New(ctx, cfg.GetDSN())
 		if err != nil {
-			log.Fatalf("failed to connect to database: %v", err)
+			log.Fatalf("failed to create db client: %v", err)
 		}
+		s.dbClient = dbClient
 	})
-	return s.dbPool
+	return s.dbClient
+}
+
+func (s *ServiceProvider) GetTxManager(ctx context.Context) client.TxManager {
+	s.txManagerOnce.Do(func() {
+		s.txManager = transaction.NewTransactionManager(s.GetDbClient(ctx).DB())
+	})
+	return s.txManager
 }
 
 func (s *ServiceProvider) GetUserRepository(ctx context.Context) repository.UserRepository {
 	s.userRepositoryOnce.Do(func() {
-		s.userRepository = repository.NewUserRepository(s.GetDbPool(ctx))
+		s.userRepository = repository.NewUserRepository(s.GetDbClient(ctx))
 	})
 	return s.userRepository
 }

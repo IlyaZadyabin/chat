@@ -8,17 +8,23 @@ import (
 	"chat/chat_server/internal/repository"
 )
 
-type ChatService struct {
+type ChatService interface {
+	Create(ctx context.Context, req *model.ChatCreate) (int64, error)
+	Delete(ctx context.Context, id int64) error
+	SendMessage(ctx context.Context, msg *model.Message) error
+}
+
+type chatService struct {
 	chatRepo repository.ChatRepository
 }
 
-func NewChatService(chatRepo repository.ChatRepository) *ChatService {
-	return &ChatService{
+func NewChatService(chatRepo repository.ChatRepository) ChatService {
+	return &chatService{
 		chatRepo: chatRepo,
 	}
 }
 
-func (s *ChatService) Create(ctx context.Context, req *model.ChatCreate) (int64, error) {
+func (s *chatService) Create(ctx context.Context, req *model.ChatCreate) (int64, error) {
 	if len(req.Usernames) == 0 {
 		return 0, fmt.Errorf("at least one username is required")
 	}
@@ -35,7 +41,7 @@ func (s *ChatService) Create(ctx context.Context, req *model.ChatCreate) (int64,
 	return chatID, nil
 }
 
-func (s *ChatService) Delete(ctx context.Context, id int64) error {
+func (s *chatService) Delete(ctx context.Context, id int64) error {
 	exists, err := s.chatRepo.ChatExists(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to check if chat exists: %w", err)
@@ -53,7 +59,7 @@ func (s *ChatService) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *ChatService) SendMessage(ctx context.Context, msg *model.Message) error {
+func (s *chatService) SendMessage(ctx context.Context, msg *model.Message) error {
 	if msg.Text == "" {
 		return fmt.Errorf("message text cannot be empty")
 	}

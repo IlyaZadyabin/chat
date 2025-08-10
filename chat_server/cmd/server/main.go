@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -9,10 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"chat/chat_server/internal/api/chat_v1"
-	"chat/chat_server/internal/database"
-	"chat/chat_server/internal/repository"
-	"chat/chat_server/internal/service"
+	"chat/chat_server/internal/app"
 	desc "chat/chat_server/pkg/chat_v1"
 )
 
@@ -24,15 +22,12 @@ func main() {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	db, err := database.NewConnection(database.NewConfig())
-	if err != nil {
-		log.Fatalf("db connect error: %v", err)
-	}
-	defer db.Close()
+	serviceProvider := app.NewServiceProvider()
 
-	chatRepo := repository.NewChatRepository(db)
-	chatService := service.NewChatService(chatRepo)
-	chatHandler := chat_v1.NewChatV1Handler(*chatService)
+	dbClient := serviceProvider.GetDbClient(context.Background())
+	defer dbClient.Close()
+
+	chatHandler := serviceProvider.GetChatHandler(context.Background())
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
