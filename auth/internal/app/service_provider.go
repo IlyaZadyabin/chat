@@ -25,7 +25,7 @@ type ServiceProvider struct {
 	userRepository     repository.UserRepository
 
 	userServiceOnce sync.Once
-	userService     *service.UserService
+	userService     service.UserService
 
 	userHandlerOnce sync.Once
 	userHandler     *user_v1.UserV1Handler
@@ -61,7 +61,7 @@ func (s *ServiceProvider) GetUserRepository(ctx context.Context) repository.User
 	return s.userRepository
 }
 
-func (s *ServiceProvider) GetUserService(ctx context.Context) *service.UserService {
+func (s *ServiceProvider) GetUserService(ctx context.Context) service.UserService {
 	s.userServiceOnce.Do(func() {
 		s.userService = service.NewUserService(s.GetUserRepository(ctx))
 	})

@@ -10,17 +10,24 @@ import (
 	"chat/auth/internal/repository"
 )
 
-type UserService struct {
+type UserService interface {
+	Create(ctx context.Context, userCreate *model.UserCreate) (int64, error)
+	Get(ctx context.Context, id int64) (*model.User, error)
+	Update(ctx context.Context, userUpdate *model.UserUpdate) error
+	Delete(ctx context.Context, id int64) error
+}
+
+type userService struct {
 	userRepo repository.UserRepository
 }
 
-func NewUserService(userRepo repository.UserRepository) *UserService {
-	return &UserService{
+func NewUserService(userRepo repository.UserRepository) UserService {
+	return &userService{
 		userRepo: userRepo,
 	}
 }
 
-func (s *UserService) Create(ctx context.Context, userCreate *model.UserCreate) (int64, error) {
+func (s *userService) Create(ctx context.Context, userCreate *model.UserCreate) (int64, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(userCreate.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return 0, fmt.Errorf("failed to hash password: %w", err)
@@ -36,7 +43,7 @@ func (s *UserService) Create(ctx context.Context, userCreate *model.UserCreate) 
 	return id, nil
 }
 
-func (s *UserService) Get(ctx context.Context, id int64) (*model.User, error) {
+func (s *userService) Get(ctx context.Context, id int64) (*model.User, error) {
 	user, err := s.userRepo.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -45,7 +52,7 @@ func (s *UserService) Get(ctx context.Context, id int64) (*model.User, error) {
 	return user, nil
 }
 
-func (s *UserService) Update(ctx context.Context, userUpdate *model.UserUpdate) error {
+func (s *userService) Update(ctx context.Context, userUpdate *model.UserUpdate) error {
 	_, err := s.userRepo.Get(ctx, userUpdate.ID)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
@@ -66,7 +73,7 @@ func (s *UserService) Update(ctx context.Context, userUpdate *model.UserUpdate) 
 	return nil
 }
 
-func (s *UserService) Delete(ctx context.Context, id int64) error {
+func (s *userService) Delete(ctx context.Context, id int64) error {
 	err := s.userRepo.Delete(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
