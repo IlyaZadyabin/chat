@@ -8,7 +8,9 @@ import (
 	"chat/chat_server/internal/api/chat_v1"
 	"chat/chat_server/internal/database"
 	"chat/chat_server/internal/repository"
+	chatRepository "chat/chat_server/internal/repository/chat"
 	"chat/chat_server/internal/service"
+	chatService "chat/chat_server/internal/service/chat"
 	"chat/pkg/database/client"
 	"chat/pkg/database/pg"
 	"chat/pkg/database/transaction"
@@ -56,14 +58,14 @@ func (s *ServiceProvider) GetTxManager(ctx context.Context) client.TxManager {
 
 func (s *ServiceProvider) GetChatRepository(ctx context.Context) repository.ChatRepository {
 	s.chatRepositoryOnce.Do(func() {
-		s.chatRepository = repository.NewChatRepository(s.GetDbClient(ctx))
+		s.chatRepository = chatRepository.NewChatRepository(s.GetDbClient(ctx))
 	})
 	return s.chatRepository
 }
 
 func (s *ServiceProvider) GetChatService(ctx context.Context) service.ChatService {
 	s.chatServiceOnce.Do(func() {
-		s.chatService = service.NewChatService(s.GetChatRepository(ctx))
+		s.chatService = chatService.NewChatService(s.GetChatRepository(ctx))
 	})
 	return s.chatService
 }

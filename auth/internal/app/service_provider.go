@@ -8,7 +8,9 @@ import (
 	"chat/auth/internal/api/user_v1"
 	"chat/auth/internal/database"
 	"chat/auth/internal/repository"
+	userRepository "chat/auth/internal/repository/user"
 	"chat/auth/internal/service"
+	userService "chat/auth/internal/service/user"
 	"chat/pkg/database/client"
 	"chat/pkg/database/pg"
 	"chat/pkg/database/transaction"
@@ -56,14 +58,14 @@ func (s *ServiceProvider) GetTxManager(ctx context.Context) client.TxManager {
 
 func (s *ServiceProvider) GetUserRepository(ctx context.Context) repository.UserRepository {
 	s.userRepositoryOnce.Do(func() {
-		s.userRepository = repository.NewUserRepository(s.GetDbClient(ctx))
+		s.userRepository = userRepository.NewUserRepository(s.GetDbClient(ctx))
 	})
 	return s.userRepository
 }
 
 func (s *ServiceProvider) GetUserService(ctx context.Context) service.UserService {
 	s.userServiceOnce.Do(func() {
-		s.userService = service.NewUserService(s.GetUserRepository(ctx))
+		s.userService = userService.NewUserService(s.GetUserRepository(ctx))
 	})
 	return s.userService
 }
