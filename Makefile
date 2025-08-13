@@ -40,3 +40,22 @@ install-golangci-lint:
 
 lint:
 	$(LOCAL_BIN)/golangci-lint run ./... --config .golangci.pipeline.yaml
+
+# Testing
+.PHONY: test
+test:
+	go clean -testcache
+	go test ./... -covermode count -coverpkg=chat/auth/internal/service/...,chat/auth/internal/api/...,chat/chat_server/internal/service/...,chat/chat_server/internal/api/... -count 5
+
+.PHONY: test-coverage
+test-coverage:
+	cd auth && make test-coverage
+	cd chat_server && make test-coverage
+	@echo "Merging coverage reports..."
+	@echo "mode: count" > coverage.out
+	@grep -h -v "^mode:" auth/coverage.out chat_server/coverage.out >> coverage.out 2>/dev/null || true
+	@echo "Generating combined HTML coverage report..."
+	@go tool cover -html=coverage.out
+	@echo "Combined coverage summary:"
+	@go tool cover -func=./coverage.out | grep "total" || echo "No coverage data found"
+	@grep -sqFx "/coverage.out" .gitignore || echo "/coverage.out" >> .gitignore

@@ -5,3 +5,8 @@
 auth/.env
 chat_server/.env
 docker-compose.env
+
+# Coverage files
+/coverage.out
+/auth/coverage.out
+/chat_server/coverage.out
