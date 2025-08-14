@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"chat/chat_server/internal/repository"
-	"chat/pkg/database/client"
-	"chat/pkg/database/transaction"
+	"common/database/client"
+	"common/database/transaction"
 )
 
 type chatRepository struct {

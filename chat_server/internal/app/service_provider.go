@@ -11,9 +11,9 @@ import (
 	chatRepository "chat/chat_server/internal/repository/chat"
 	"chat/chat_server/internal/service"
 	chatService "chat/chat_server/internal/service/chat"
-	"chat/pkg/database/client"
-	"chat/pkg/database/pg"
-	"chat/pkg/database/transaction"
+	"common/database/client"
+	"common/database/pg"
+	"common/database/transaction"
 )
 
 type ServiceProvider struct {

@@ -2,7 +2,10 @@ module chat
 
 go 1.23.0
 
+replace common => ./common
+
 require (
+	common v0.0.0-00010101000000-000000000000
 	github.com/georgysavva/scany v1.2.3
 	github.com/gojuno/minimock/v3 v3.4.5
 	github.com/jackc/pgconn v1.14.3

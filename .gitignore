@@ -1,4 +1,5 @@
 .idea
+**/.DS_Store
 /auth/bin/
 /chat_server/bin/
 

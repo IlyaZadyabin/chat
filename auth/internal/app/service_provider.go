@@ -11,9 +11,9 @@ import (
 	userRepository "chat/auth/internal/repository/user"
 	"chat/auth/internal/service"
 	userService "chat/auth/internal/service/user"
-	"chat/pkg/database/client"
-	"chat/pkg/database/pg"
-	"chat/pkg/database/transaction"
+	"common/database/client"
+	"common/database/pg"
+	"common/database/transaction"
 )
 
 type ServiceProvider struct {

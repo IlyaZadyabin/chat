@@ -10,7 +10,7 @@ import (
 
 	"chat/auth/internal/model"
 	"chat/auth/internal/repository"
-	"chat/pkg/database/client"
+	"common/database/client"
 )
 
 type userRepository struct {
