@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"sync"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
 	"chat/auth/internal/app"
@@ -15,6 +20,7 @@ import (
 )
 
 const grpcPort = 50051
+const httpPort = 8081
 
 func main() {
 	err := godotenv.Load(".env")
@@ -29,16 +35,57 @@ func main() {
 
 	userHandler := serviceProvider.GetUserHandler(context.Background())
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+	grpcAddr := fmt.Sprintf(":%d", grpcPort)
+	httpAddr := fmt.Sprintf(":%d", httpPort)
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if err := runGRPCServer(userHandler, grpcAddr); err != nil {
+			log.Fatalf("failed to run gRPC server: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if err := runHTTPServer(grpcAddr, httpAddr); err != nil {
+			log.Fatalf("failed to run HTTP server: %v", err)
+		}
+	}()
+
+	wg.Wait()
+}
+
+func runGRPCServer(handler desc.UserV1Server, addr string) error {
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("listen error: %v", err)
+		return err
 	}
 
 	grpcSrv := grpc.NewServer()
 	reflection.Register(grpcSrv)
-	desc.RegisterUserV1Server(grpcSrv, userHandler)
-	log.Printf("Auth server listening on %v", lis.Addr())
-	if err := grpcSrv.Serve(lis); err != nil {
-		log.Fatalf("serve error: %v", err)
+	desc.RegisterUserV1Server(grpcSrv, handler)
+	log.Printf("Auth gRPC server listening on %v", lis.Addr())
+	return grpcSrv.Serve(lis)
+}
+
+func runHTTPServer(grpcAddr, httpAddr string) error {
+	mux := runtime.NewServeMux()
+	ctx := context.Background()
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	if err := desc.RegisterUserV1HandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
+		return err
 	}
+
+	corsMiddleware := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Content-Length", "Authorization"},
+		AllowCredentials: true,
+	})
+
+	log.Printf("Auth HTTP gateway listening on %s", httpAddr)
+	return http.ListenAndServe(httpAddr, corsMiddleware.Handler(mux))
 }
