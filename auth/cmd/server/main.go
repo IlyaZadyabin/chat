@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"chat/auth/internal/app"
+	"chat/auth/internal/interceptor"
 	desc "chat/auth/pkg/user_v1"
 )
 
@@ -64,7 +65,9 @@ func runGRPCServer(handler desc.UserV1Server, addr string) error {
 		return err
 	}
 
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(
+		grpc.UnaryInterceptor(interceptor.ValidateInterceptor),
+	)
 	reflection.Register(grpcSrv)
 	desc.RegisterUserV1Server(grpcSrv, handler)
 	log.Printf("Auth gRPC server listening on %v", lis.Addr())

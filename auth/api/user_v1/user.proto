@@ -6,6 +6,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 import "google/api/annotations.proto";
+import "validate/validate.proto";
 
 option go_package = "chat/auth/pkg/user_v1;user_v1";
 
@@ -38,8 +39,8 @@ service UserV1 {
 }
 
 message UserInfo {
-  string name = 1;
-  string email = 2;
+  string name = 1 [(validate.rules).string = {min_len: 1, max_len: 100}];
+  string email = 2 [(validate.rules).string = {min_len: 1, max_len: 255}];
   Role role = 3;
 }
 
@@ -63,8 +64,8 @@ message UpdateUserInfo {
 
 message CreateRequest {
   UserInfo info = 1;
-  string password = 2;
-  string password_confirm = 3;
+  string password = 2 [(validate.rules).string = {min_len: 8, max_len: 50}];
+  string password_confirm = 3 [(validate.rules).string = {min_len: 8, max_len: 50}];
 }
 
 message CreateResponse {
