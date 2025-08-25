@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"chat/auth/internal/api/user_v1"
+	"chat/auth/internal/config"
 	"chat/auth/internal/database"
 	"chat/auth/internal/repository"
 	userRepository "chat/auth/internal/repository/user"
@@ -31,6 +32,9 @@ type ServiceProvider struct {
 
 	userHandlerOnce sync.Once
 	userHandler     *user_v1.UserV1Handler
+
+	swaggerConfigOnce sync.Once
+	swaggerConfig     config.SwaggerConfig
 }
 
 func NewServiceProvider() *ServiceProvider {
@@ -75,4 +79,11 @@ func (s *ServiceProvider) GetUserHandler(ctx context.Context) *user_v1.UserV1Han
 		s.userHandler = user_v1.NewUserV1Handler(s.GetUserService(ctx))
 	})
 	return s.userHandler
+}
+
+func (s *ServiceProvider) GetSwaggerConfig() config.SwaggerConfig {
+	s.swaggerConfigOnce.Do(func() {
+		s.swaggerConfig = config.NewSwaggerConfig()
+	})
+	return s.swaggerConfig
 }

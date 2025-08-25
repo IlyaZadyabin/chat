@@ -11,6 +11,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2
 	github.com/jackc/pgx/v4 v4.18.2
 	github.com/joho/godotenv v1.5.1
+	github.com/rakyll/statik v0.1.7
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.39.0

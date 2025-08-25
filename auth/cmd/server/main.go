@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
+	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -18,6 +20,7 @@ import (
 	"chat/auth/internal/app"
 	"chat/auth/internal/interceptor"
 	desc "chat/auth/pkg/user_v1"
+	_ "chat/auth/statik"
 )
 
 const grpcPort = 50051
@@ -38,9 +41,10 @@ func main() {
 
 	grpcAddr := fmt.Sprintf(":%d", grpcPort)
 	httpAddr := fmt.Sprintf(":%d", httpPort)
+	swaggerAddr := serviceProvider.GetSwaggerConfig().Address()
 
 	wg := sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
@@ -53,6 +57,13 @@ func main() {
 		defer wg.Done()
 		if err := runHTTPServer(grpcAddr, httpAddr); err != nil {
 			log.Fatalf("failed to run HTTP server: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if err := runSwaggerServer(swaggerAddr); err != nil {
+			log.Fatalf("failed to run Swagger server: %v", err)
 		}
 	}()
 
@@ -91,4 +102,44 @@ func runHTTPServer(grpcAddr, httpAddr string) error {
 
 	log.Printf("Auth HTTP gateway listening on %s", httpAddr)
 	return http.ListenAndServe(httpAddr, corsMiddleware.Handler(mux))
+}
+
+func runSwaggerServer(addr string) error {
+	statikFs, err := fs.New()
+	if err != nil {
+		return err
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/", http.StripPrefix("/", http.FileServer(statikFs)))
+
+	mux.HandleFunc("/api.swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Serving swagger file: /api.swagger.json")
+
+		file, err := statikFs.Open("/api.swagger.json")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+
+		content, err := io.ReadAll(file)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write(content)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Successfully served swagger file")
+	})
+
+	log.Printf("Auth Swagger server listening on %s", addr)
+	log.Printf("Visit http://%s to view the Swagger UI", addr)
+	return http.ListenAndServe(addr, mux)
 }
