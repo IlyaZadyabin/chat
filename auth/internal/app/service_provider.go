@@ -10,6 +10,7 @@ import (
 	"chat/auth/internal/api/user_v1"
 	"chat/auth/internal/config"
 	"chat/auth/internal/database"
+	"chat/auth/internal/jwt"
 	"chat/auth/internal/repository"
 	userRepository "chat/auth/internal/repository/user"
 	"chat/auth/internal/service"
@@ -48,6 +49,9 @@ type ServiceProvider struct {
 
 	accessHandlerOnce sync.Once
 	accessHandler     *access_v1.AccessV1Handler
+
+	jwtTokenManagerOnce sync.Once
+	jwtTokenManager     *jwt.TokenManager
 
 	swaggerConfigOnce sync.Once
 	swaggerConfig     config.SwaggerConfig
@@ -99,14 +103,17 @@ func (s *ServiceProvider) GetUserHandler(ctx context.Context) *user_v1.UserV1Han
 
 func (s *ServiceProvider) GetAuthService(ctx context.Context) service.AuthService {
 	s.authServiceOnce.Do(func() {
-		s.authService = authService.NewAuthService(s.GetUserRepository(ctx))
+		s.authService = authService.NewAuthService(
+			s.GetUserRepository(ctx),
+			s.GetJWTTokenManager(ctx),
+		)
 	})
 	return s.authService
 }
 
 func (s *ServiceProvider) GetAccessService(ctx context.Context) service.AccessService {
 	s.accessServiceOnce.Do(func() {
-		s.accessService = accessService.NewAccessService()
+		s.accessService = accessService.NewAccessService(s.GetJWTTokenManager(ctx))
 	})
 	return s.accessService
 }
@@ -123,6 +130,19 @@ func (s *ServiceProvider) GetAccessHandler(ctx context.Context) *access_v1.Acces
 		s.accessHandler = access_v1.NewAccessV1Handler(s.GetAccessService(ctx))
 	})
 	return s.accessHandler
+}
+
+func (s *ServiceProvider) GetJWTTokenManager(ctx context.Context) *jwt.TokenManager {
+	s.jwtTokenManagerOnce.Do(func() {
+		jwtConfig := config.NewJWTConfig()
+		s.jwtTokenManager = jwt.NewTokenManager(
+			jwtConfig.RefreshSecretKey,
+			jwtConfig.AccessSecretKey,
+			jwtConfig.RefreshTokenExpiry,
+			jwtConfig.AccessTokenExpiry,
+		)
+	})
+	return s.jwtTokenManager
 }
 
 func (s *ServiceProvider) GetSwaggerConfig() config.SwaggerConfig {

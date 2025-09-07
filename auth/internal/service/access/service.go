@@ -3,28 +3,75 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
 
+	"google.golang.org/grpc/metadata"
+
+	"chat/auth/internal/jwt"
 	"chat/auth/internal/service"
 )
 
+const (
+	authPrefix = "Bearer "
+)
+
 type accessService struct {
-	// TODO: Add JWT token validation logic here when implementing actual JWT
+	tokenManager *jwt.TokenManager
 }
 
-func NewAccessService() service.AccessService {
-	return &accessService{}
+func NewAccessService(tokenManager *jwt.TokenManager) service.AccessService {
+	return &accessService{
+		tokenManager: tokenManager,
+	}
 }
 
 func (s *accessService) Check(ctx context.Context, endpointAddress string) error {
-	// TODO: Implement actual access check logic with JWT token validation
-	// For now, just do a basic validation that the endpoint is not empty
 	if endpointAddress == "" {
 		return fmt.Errorf("endpoint address is required")
 	}
 
-	// TODO: Extract JWT from request context and validate it
-	// TODO: Check user permissions for the given endpoint
-	
-	// For this basic implementation, we'll allow access to all endpoints
-	return nil
+	log.Println("Checking access for endpoint:", endpointAddress)
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return fmt.Errorf("metadata is not provided")
+	}
+
+	authHeader, ok := md["authorization"]
+	if !ok || len(authHeader) == 0 {
+		return fmt.Errorf("authorization header is not provided")
+	}
+
+	if !strings.HasPrefix(authHeader[0], authPrefix) {
+		return fmt.Errorf("invalid authorization header format")
+	}
+
+	accessToken := strings.TrimPrefix(authHeader[0], authPrefix)
+
+	claims, err := s.tokenManager.VerifyAccessToken(accessToken)
+	if err != nil {
+		return fmt.Errorf("access token is invalid: %w", err)
+	}
+
+	accessibleRoles := s.getAccessibleRoles()
+
+	requiredRole, ok := accessibleRoles[endpointAddress]
+	if !ok {
+		return nil
+	}
+
+	if requiredRole == claims.Role {
+		return nil
+	}
+
+	return fmt.Errorf("access denied: role %s required, but user has role %s", requiredRole, claims.Role)
+}
+
+// getAccessibleRoles returns a map of endpoint addresses to required roles
+func (s *accessService) getAccessibleRoles() map[string]string {
+	return map[string]string{
+		"/user_v1.UserV1/Create": "admin",
+		"/user_v1.UserV1/Delete": "admin",
+	}
 }

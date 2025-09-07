@@ -6,17 +6,20 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"chat/auth/internal/jwt"
 	"chat/auth/internal/repository"
 	"chat/auth/internal/service"
 )
 
 type authService struct {
-	userRepo repository.UserRepository
+	userRepo     repository.UserRepository
+	tokenManager *jwt.TokenManager
 }
 
-func NewAuthService(userRepo repository.UserRepository) service.AuthService {
+func NewAuthService(userRepo repository.UserRepository, tokenManager *jwt.TokenManager) service.AuthService {
 	return &authService{
-		userRepo: userRepo,
+		userRepo:     userRepo,
+		tokenManager: tokenManager,
 	}
 }
 
@@ -26,29 +29,70 @@ func (s *authService) Login(ctx context.Context, username, password string) (str
 		return "", fmt.Errorf("user not found: %w", err)
 	}
 
-
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Info.Password), []byte(password)); err != nil {
 		return "", fmt.Errorf("invalid credentials: %w", err)
 	}
 
-	// TODO: Generate actual JWT refresh token
-	refreshToken := fmt.Sprintf("refresh_token_for_user_%d", user.ID)
-	
+	userInfo := jwt.UserInfo{
+		UserID:   user.ID,
+		Username: user.Info.Name,
+		Role:     user.Info.Role,
+	}
+
+	refreshToken, err := s.tokenManager.GenerateRefreshToken(userInfo)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
 	return refreshToken, nil
 }
 
 func (s *authService) GetRefreshToken(ctx context.Context, refreshToken string) (string, error) {
-	// TODO: Validate old refresh token and extract user info
-	// For now, just return a new mock token
-	newRefreshToken := fmt.Sprintf("new_%s", refreshToken)
-	
+	claims, err := s.tokenManager.VerifyRefreshToken(refreshToken)
+	if err != nil {
+		return "", fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	user, err := s.userRepo.GetByName(ctx, claims.Username)
+	if err != nil {
+		return "", fmt.Errorf("user not found: %w", err)
+	}
+
+	userInfo := jwt.UserInfo{
+		UserID:   user.ID,
+		Username: user.Info.Name,
+		Role:     user.Info.Role,
+	}
+
+	newRefreshToken, err := s.tokenManager.GenerateRefreshToken(userInfo)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
 	return newRefreshToken, nil
 }
 
 func (s *authService) GetAccessToken(ctx context.Context, refreshToken string) (string, error) {
-	// TODO: Validate refresh token and extract user info
-	// For now, just return a mock access token
-	accessToken := fmt.Sprintf("access_token_from_%s", refreshToken)
-	
+	claims, err := s.tokenManager.VerifyRefreshToken(refreshToken)
+	if err != nil {
+		return "", fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	user, err := s.userRepo.GetByName(ctx, claims.Username)
+	if err != nil {
+		return "", fmt.Errorf("user not found: %w", err)
+	}
+
+	userInfo := jwt.UserInfo{
+		UserID:   user.ID,
+		Username: user.Info.Name,
+		Role:     user.Info.Role,
+	}
+
+	accessToken, err := s.tokenManager.GenerateAccessToken(userInfo)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate access token: %w", err)
+	}
+
 	return accessToken, nil
 }
