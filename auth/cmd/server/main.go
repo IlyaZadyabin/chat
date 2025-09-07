@@ -19,7 +19,9 @@ import (
 
 	"chat/auth/internal/app"
 	"chat/auth/internal/interceptor"
-	desc "chat/auth/pkg/user_v1"
+	accessDesc "chat/auth/pkg/access_v1"
+	authDesc "chat/auth/pkg/auth_v1"
+	userDesc "chat/auth/pkg/user_v1"
 	_ "chat/auth/statik"
 )
 
@@ -38,6 +40,8 @@ func main() {
 	defer dbClient.Close()
 
 	userHandler := serviceProvider.GetUserHandler(context.Background())
+	authHandler := serviceProvider.GetAuthHandler(context.Background())
+	accessHandler := serviceProvider.GetAccessHandler(context.Background())
 
 	grpcAddr := fmt.Sprintf(":%d", grpcPort)
 	httpAddr := fmt.Sprintf(":%d", httpPort)
@@ -48,7 +52,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		if err := runGRPCServer(userHandler, grpcAddr); err != nil {
+		if err := runGRPCServer(userHandler, authHandler, accessHandler, grpcAddr); err != nil {
 			log.Fatalf("failed to run gRPC server: %v", err)
 		}
 	}()
@@ -70,7 +74,7 @@ func main() {
 	wg.Wait()
 }
 
-func runGRPCServer(handler desc.UserV1Server, addr string) error {
+func runGRPCServer(userHandler userDesc.UserV1Server, authHandler authDesc.AuthV1Server, accessHandler accessDesc.AccessV1Server, addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -80,7 +84,9 @@ func runGRPCServer(handler desc.UserV1Server, addr string) error {
 		grpc.UnaryInterceptor(interceptor.ValidateInterceptor),
 	)
 	reflection.Register(grpcSrv)
-	desc.RegisterUserV1Server(grpcSrv, handler)
+	userDesc.RegisterUserV1Server(grpcSrv, userHandler)
+	authDesc.RegisterAuthV1Server(grpcSrv, authHandler)
+	accessDesc.RegisterAccessV1Server(grpcSrv, accessHandler)
 	log.Printf("Auth gRPC server listening on %v", lis.Addr())
 	return grpcSrv.Serve(lis)
 }
@@ -89,7 +95,8 @@ func runHTTPServer(grpcAddr, httpAddr string) error {
 	mux := runtime.NewServeMux()
 	ctx := context.Background()
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	if err := desc.RegisterUserV1HandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
+	
+	if err := userDesc.RegisterUserV1HandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
 		return err
 	}
 

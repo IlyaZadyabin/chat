@@ -69,9 +69,44 @@ func (r *userRepository) Get(ctx context.Context, id int64) (*model.User, error)
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	user.Info = &model.UserInfo{Name: name, Email: email, Role: roleStr}
+	user.Info = &model.UserInfo{Name: name, Email: email, Password: passwordHash, Role: roleStr}
 	user.CreatedAt = timestamppb.New(createdAt)
 	user.UpdatedAt = timestamppb.New(updatedAt)
+	return &user, nil
+}
+
+func (r *userRepository) GetByName(ctx context.Context, name string) (*model.User, error) {
+	q := client.Query{
+		Name: "user_repository.GetByName",
+		QueryRaw: `
+			SELECT id, name, email, password_hash, role, created_at, updated_at
+			FROM users
+			WHERE name = $1`,
+	}
+
+	row := r.db.DB().QueryRowContext(ctx, q, name)
+
+	var user model.User
+	var userName, email, passwordHash, roleStr string
+	var createdAt, updatedAt time.Time
+
+	err := row.Scan(&user.ID, &userName, &email, &passwordHash, &roleStr, &createdAt, &updatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("user not found: %w", err)
+		}
+		return nil, fmt.Errorf("failed to get user by name: %w", err)
+	}
+
+	user.Info = &model.UserInfo{
+		Name:     userName,
+		Email:    email,
+		Password: passwordHash,
+		Role:     roleStr,
+	}
+	user.CreatedAt = timestamppb.New(createdAt)
+	user.UpdatedAt = timestamppb.New(updatedAt)
+
 	return &user, nil
 }
 
@@ -133,7 +168,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.U
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
-	user.Info = &model.UserInfo{Name: name, Email: email, Role: roleStr}
+	user.Info = &model.UserInfo{Name: name, Email: email, Password: passwordHash, Role: roleStr}
 	user.CreatedAt = timestamppb.New(createdAt)
 	user.UpdatedAt = timestamppb.New(updatedAt)
 	return &user, nil

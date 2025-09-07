@@ -5,12 +5,16 @@ import (
 	"log"
 	"sync"
 
+	"chat/auth/internal/api/access_v1"
+	"chat/auth/internal/api/auth_v1"
 	"chat/auth/internal/api/user_v1"
 	"chat/auth/internal/config"
 	"chat/auth/internal/database"
 	"chat/auth/internal/repository"
 	userRepository "chat/auth/internal/repository/user"
 	"chat/auth/internal/service"
+	accessService "chat/auth/internal/service/access"
+	authService "chat/auth/internal/service/auth"
 	userService "chat/auth/internal/service/user"
 	"common/database/client"
 	"common/database/pg"
@@ -30,8 +34,20 @@ type ServiceProvider struct {
 	userServiceOnce sync.Once
 	userService     service.UserService
 
+	authServiceOnce sync.Once
+	authService     service.AuthService
+
+	accessServiceOnce sync.Once
+	accessService     service.AccessService
+
 	userHandlerOnce sync.Once
 	userHandler     *user_v1.UserV1Handler
+
+	authHandlerOnce sync.Once
+	authHandler     *auth_v1.AuthV1Handler
+
+	accessHandlerOnce sync.Once
+	accessHandler     *access_v1.AccessV1Handler
 
 	swaggerConfigOnce sync.Once
 	swaggerConfig     config.SwaggerConfig
@@ -79,6 +95,34 @@ func (s *ServiceProvider) GetUserHandler(ctx context.Context) *user_v1.UserV1Han
 		s.userHandler = user_v1.NewUserV1Handler(s.GetUserService(ctx))
 	})
 	return s.userHandler
+}
+
+func (s *ServiceProvider) GetAuthService(ctx context.Context) service.AuthService {
+	s.authServiceOnce.Do(func() {
+		s.authService = authService.NewAuthService(s.GetUserRepository(ctx))
+	})
+	return s.authService
+}
+
+func (s *ServiceProvider) GetAccessService(ctx context.Context) service.AccessService {
+	s.accessServiceOnce.Do(func() {
+		s.accessService = accessService.NewAccessService()
+	})
+	return s.accessService
+}
+
+func (s *ServiceProvider) GetAuthHandler(ctx context.Context) *auth_v1.AuthV1Handler {
+	s.authHandlerOnce.Do(func() {
+		s.authHandler = auth_v1.NewAuthV1Handler(s.GetAuthService(ctx))
+	})
+	return s.authHandler
+}
+
+func (s *ServiceProvider) GetAccessHandler(ctx context.Context) *access_v1.AccessV1Handler {
+	s.accessHandlerOnce.Do(func() {
+		s.accessHandler = access_v1.NewAccessV1Handler(s.GetAccessService(ctx))
+	})
+	return s.accessHandler
 }
 
 func (s *ServiceProvider) GetSwaggerConfig() config.SwaggerConfig {

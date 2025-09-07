@@ -12,4 +12,5 @@ type UserRepository interface {
 	Update(ctx context.Context, user *model.UserUpdate) error
 	Delete(ctx context.Context, id int64) error
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
+	GetByName(ctx context.Context, name string) (*model.User, error)
 }
