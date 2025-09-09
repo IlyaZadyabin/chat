@@ -28,13 +28,16 @@ func main() {
 	defer dbClient.Close()
 
 	chatHandler := serviceProvider.GetChatHandler(context.Background())
+	authInterceptor := serviceProvider.GetAuthInterceptor()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
 		log.Fatalf("listen error: %v", err)
 	}
 
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(
+		grpc.UnaryInterceptor(authInterceptor.Unary()),
+	)
 	reflection.Register(grpcSrv)
 	desc.RegisterChatV1Server(grpcSrv, chatHandler)
 	log.Printf("Chat server listening on %v", lis.Addr())

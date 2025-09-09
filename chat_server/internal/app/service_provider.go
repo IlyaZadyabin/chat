@@ -5,8 +5,14 @@ import (
 	"log"
 	"sync"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"chat/auth/pkg/access_v1"
 	"chat/chat_server/internal/api/chat_v1"
+	"chat/chat_server/internal/config"
 	"chat/chat_server/internal/database"
+	"chat/chat_server/internal/interceptor"
 	"chat/chat_server/internal/repository"
 	chatRepository "chat/chat_server/internal/repository/chat"
 	"chat/chat_server/internal/service"
@@ -31,6 +37,12 @@ type ServiceProvider struct {
 
 	chatHandlerOnce sync.Once
 	chatHandler     *chat_v1.ChatV1Handler
+
+	authClientOnce sync.Once
+	authClient     access_v1.AccessV1Client
+
+	authInterceptorOnce sync.Once
+	authInterceptor     *interceptor.AuthInterceptor
 }
 
 func NewServiceProvider() *ServiceProvider {
@@ -75,4 +87,23 @@ func (s *ServiceProvider) GetChatHandler(ctx context.Context) *chat_v1.ChatV1Han
 		s.chatHandler = chat_v1.NewChatV1Handler(s.GetChatService(ctx))
 	})
 	return s.chatHandler
+}
+
+func (s *ServiceProvider) GetAuthClient() access_v1.AccessV1Client {
+	s.authClientOnce.Do(func() {
+		authConfig := config.NewAuthConfig()
+		conn, err := grpc.NewClient(authConfig.ServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("failed to connect to auth service: %v", err)
+		}
+		s.authClient = access_v1.NewAccessV1Client(conn)
+	})
+	return s.authClient
+}
+
+func (s *ServiceProvider) GetAuthInterceptor() *interceptor.AuthInterceptor {
+	s.authInterceptorOnce.Do(func() {
+		s.authInterceptor = interceptor.NewAuthInterceptor(s.GetAuthClient())
+	})
+	return s.authInterceptor
 }
