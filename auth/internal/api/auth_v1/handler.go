@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
+	"chat/auth/internal/logger"
 	"chat/auth/internal/service"
 	desc "chat/auth/pkg/auth_v1"
 )
@@ -26,6 +28,8 @@ func (h *AuthV1Handler) Register(server *grpc.Server) {
 }
 
 func (h *AuthV1Handler) Login(ctx context.Context, req *desc.LoginRequest) (*desc.LoginResponse, error) {
+	logger.Info("User login attempt...", zap.String("username", req.GetUsername()))
+
 	refreshToken, err := h.authService.Login(ctx, req.GetUsername(), req.GetPassword())
 	if err != nil {
 		return nil, fmt.Errorf("failed to login: %w", err)
@@ -35,6 +39,8 @@ func (h *AuthV1Handler) Login(ctx context.Context, req *desc.LoginRequest) (*des
 }
 
 func (h *AuthV1Handler) GetRefreshToken(ctx context.Context, req *desc.GetRefreshTokenRequest) (*desc.GetRefreshTokenResponse, error) {
+	logger.Info("Getting refresh token...")
+
 	newRefreshToken, err := h.authService.GetRefreshToken(ctx, req.GetRefreshToken())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get refresh token: %w", err)
@@ -44,6 +50,8 @@ func (h *AuthV1Handler) GetRefreshToken(ctx context.Context, req *desc.GetRefres
 }
 
 func (h *AuthV1Handler) GetAccessToken(ctx context.Context, req *desc.GetAccessTokenRequest) (*desc.GetAccessTokenResponse, error) {
+	logger.Info("Getting access token...")
+
 	accessToken, err := h.authService.GetAccessToken(ctx, req.GetRefreshToken())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get access token: %w", err)

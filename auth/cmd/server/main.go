@@ -2,37 +2,50 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
 	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"chat/auth/internal/app"
 	"chat/auth/internal/interceptor"
+	"chat/auth/internal/logger"
 	accessDesc "chat/auth/pkg/access_v1"
 	authDesc "chat/auth/pkg/auth_v1"
 	userDesc "chat/auth/pkg/user_v1"
 	_ "chat/auth/statik"
 )
 
+var logLevel = flag.String("l", "info", "log level")
+
 const grpcPort = 50051
 const httpPort = 8081
 
 func main() {
+	flag.Parse()
+
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
+
+	logger.Init(getCore(getAtomicLevel()))
 
 	serviceProvider := app.NewServiceProvider()
 
@@ -81,7 +94,12 @@ func runGRPCServer(userHandler userDesc.UserV1Server, authHandler authDesc.AuthV
 	}
 
 	grpcSrv := grpc.NewServer(
-		grpc.UnaryInterceptor(interceptor.ValidateInterceptor),
+		grpc.UnaryInterceptor(
+			grpcMiddleware.ChainUnaryServer(
+				interceptor.LogInterceptor,
+				interceptor.ValidateInterceptor,
+			),
+		),
 	)
 	reflection.Register(grpcSrv)
 	userDesc.RegisterUserV1Server(grpcSrv, userHandler)
@@ -95,7 +113,7 @@ func runHTTPServer(grpcAddr, httpAddr string) error {
 	mux := runtime.NewServeMux()
 	ctx := context.Background()
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	
+
 	if err := userDesc.RegisterUserV1HandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
 		return err
 	}
@@ -149,4 +167,39 @@ func runSwaggerServer(addr string) error {
 	log.Printf("Auth Swagger server listening on %s", addr)
 	log.Printf("Visit http://%s to view the Swagger UI", addr)
 	return http.ListenAndServe(addr, mux)
+}
+
+func getCore(level zap.AtomicLevel) zapcore.Core {
+	stdout := zapcore.AddSync(os.Stdout)
+
+	file := zapcore.AddSync(&lumberjack.Logger{
+		Filename:   "logs/auth.log",
+		MaxSize:    10,
+		MaxBackups: 3,
+		MaxAge:     7,
+	})
+
+	productionCfg := zap.NewProductionEncoderConfig()
+	productionCfg.TimeKey = "timestamp"
+	productionCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	developmentCfg := zap.NewDevelopmentEncoderConfig()
+	developmentCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
+	consoleEncoder := zapcore.NewConsoleEncoder(developmentCfg)
+	fileEncoder := zapcore.NewJSONEncoder(productionCfg)
+
+	return zapcore.NewTee(
+		zapcore.NewCore(consoleEncoder, stdout, level),
+		zapcore.NewCore(fileEncoder, file, level),
+	)
+}
+
+func getAtomicLevel() zap.AtomicLevel {
+	var level zapcore.Level
+	if err := level.Set(*logLevel); err != nil {
+		log.Fatalf("failed to set log level: %v", err)
+	}
+
+	return zap.NewAtomicLevelAt(level)
 }

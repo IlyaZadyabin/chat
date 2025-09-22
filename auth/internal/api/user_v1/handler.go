@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"chat/auth/internal/converter"
+	"chat/auth/internal/logger"
 	"chat/auth/internal/service"
 	desc "chat/auth/pkg/user_v1"
 )
@@ -28,6 +30,8 @@ func (h *UserV1Handler) Register(server *grpc.Server) {
 }
 
 func (h *UserV1Handler) Create(ctx context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
+	logger.Info("Creating user...", zap.String("name", req.GetInfo().GetName()), zap.String("email", req.GetInfo().GetEmail()))
+
 	userCreate := converter.ToUserCreateFromDesc(req)
 
 	id, err := h.userService.Create(ctx, userCreate)
@@ -39,6 +43,8 @@ func (h *UserV1Handler) Create(ctx context.Context, req *desc.CreateRequest) (*d
 }
 
 func (h *UserV1Handler) Get(ctx context.Context, req *desc.GetRequest) (*desc.GetResponse, error) {
+	logger.Info("Getting user...", zap.Int64("id", req.GetId()))
+
 	user, err := h.userService.Get(ctx, req.GetId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -50,6 +56,8 @@ func (h *UserV1Handler) Get(ctx context.Context, req *desc.GetRequest) (*desc.Ge
 }
 
 func (h *UserV1Handler) Update(ctx context.Context, req *desc.UpdateRequest) (*emptypb.Empty, error) {
+	logger.Info("Updating user...", zap.Int64("id", req.GetId()))
+
 	err := h.userService.Update(ctx, converter.ToUserUpdateFromDesc(req))
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user: %w", err)
@@ -59,6 +67,8 @@ func (h *UserV1Handler) Update(ctx context.Context, req *desc.UpdateRequest) (*e
 }
 
 func (h *UserV1Handler) Delete(ctx context.Context, req *desc.DeleteRequest) (*emptypb.Empty, error) {
+	logger.Info("Deleting user...", zap.Int64("id", req.GetId()))
+
 	err := h.userService.Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete user: %w", err)

@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"chat/auth/internal/logger"
 	"chat/auth/internal/service"
 	desc "chat/auth/pkg/access_v1"
 )
@@ -27,6 +29,8 @@ func (h *AccessV1Handler) Register(server *grpc.Server) {
 }
 
 func (h *AccessV1Handler) Check(ctx context.Context, req *desc.CheckRequest) (*emptypb.Empty, error) {
+	logger.Info("Checking access...", zap.String("endpoint", req.GetEndpointAddress()))
+
 	err := h.accessService.Check(ctx, req.GetEndpointAddress())
 	if err != nil {
 		return nil, fmt.Errorf("access denied: %w", err)

@@ -11,3 +11,7 @@ docker-compose.env
 /coverage.out
 /auth/coverage.out
 /chat_server/coverage.out
+
+# Log files
+/auth/logs/
+/chat_server/logs/
