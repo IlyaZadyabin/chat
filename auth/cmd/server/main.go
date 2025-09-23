@@ -14,6 +14,7 @@ import (
 	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rakyll/statik/fs"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
@@ -26,6 +27,7 @@ import (
 	"chat/auth/internal/app"
 	"chat/auth/internal/interceptor"
 	"chat/auth/internal/logger"
+	"chat/auth/internal/metric"
 	accessDesc "chat/auth/pkg/access_v1"
 	authDesc "chat/auth/pkg/auth_v1"
 	userDesc "chat/auth/pkg/user_v1"
@@ -47,6 +49,11 @@ func main() {
 
 	logger.Init(getCore(getAtomicLevel()))
 
+	err = metric.Init(context.Background())
+	if err != nil {
+		log.Fatalf("failed to init metrics: %v", err)
+	}
+
 	serviceProvider := app.NewServiceProvider()
 
 	dbClient := serviceProvider.GetDbClient(context.Background())
@@ -59,9 +66,18 @@ func main() {
 	grpcAddr := fmt.Sprintf(":%d", grpcPort)
 	httpAddr := fmt.Sprintf(":%d", httpPort)
 	swaggerAddr := serviceProvider.GetSwaggerConfig().Address()
+	metricsHost := os.Getenv("METRICS_HOST")
+	metricsPort := os.Getenv("METRICS_PORT")
+	if metricsHost == "" {
+		metricsHost = "localhost"
+	}
+	if metricsPort == "" {
+		metricsPort = "2112"
+	}
+	metricsAddr := metricsHost + ":" + metricsPort
 
 	wg := sync.WaitGroup{}
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
@@ -84,6 +100,13 @@ func main() {
 		}
 	}()
 
+	go func() {
+		defer wg.Done()
+		if err := runPrometheusServer(metricsAddr); err != nil {
+			log.Fatalf("failed to run Prometheus server: %v", err)
+		}
+	}()
+
 	wg.Wait()
 }
 
@@ -96,6 +119,7 @@ func runGRPCServer(userHandler userDesc.UserV1Server, authHandler authDesc.AuthV
 	grpcSrv := grpc.NewServer(
 		grpc.UnaryInterceptor(
 			grpcMiddleware.ChainUnaryServer(
+				interceptor.MetricsInterceptor,
 				interceptor.LogInterceptor,
 				interceptor.ValidateInterceptor,
 			),
@@ -202,4 +226,19 @@ func getAtomicLevel() zap.AtomicLevel {
 	}
 
 	return zap.NewAtomicLevelAt(level)
+}
+
+func runPrometheusServer(addr string) error {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	prometheusServer := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	log.Printf("Auth Prometheus server listening on %s", addr)
+	log.Printf("Visit http://%s/metrics to view metrics", addr)
+
+	return prometheusServer.ListenAndServe()
 }
