@@ -2,6 +2,7 @@ volumes:
   postgres_auth_volume:
   postgres_chat_volume:
   prometheus_data:
+  grafana_data:
 
 services:
   auth-db:
@@ -57,3 +58,20 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana-oss:10.0.3
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./auth/grafana/provisioning:/etc/grafana/provisioning
+      - ./auth/grafana/dashboards:/var/lib/grafana/dashboards

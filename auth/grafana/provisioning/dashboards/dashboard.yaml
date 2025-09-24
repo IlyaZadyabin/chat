@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: auth
+    orgId: 1
+    folder: Auth Service
+    folderUid: auth-service
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
