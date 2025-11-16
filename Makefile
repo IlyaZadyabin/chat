@@ -9,6 +9,29 @@ db-up:
 db-down:
 	docker-compose down
 
+.PHONY: compose-up compose-down compose-db compose-migrate compose-services compose-logs compose-monitoring
+
+compose-up: compose-db compose-migrate compose-services compose-monitoring
+
+compose-db:
+	docker-compose up -d auth-db chat-db
+
+compose-migrate:
+	$(MAKE) install-deps
+	$(MAKE) local-migration-up
+
+compose-services:
+	docker-compose up -d auth-service chat-service
+
+compose-down:
+	docker-compose down
+
+compose-logs:
+	docker-compose logs -f auth-service chat-service
+
+compose-monitoring:
+	docker-compose up -d prometheus grafana
+
 # Migrations
 install-deps:
 	cd auth && make install-deps
