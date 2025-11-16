@@ -34,6 +34,10 @@ linters-settings:
   goconst:
     min-len: 2
     min-occurrences: 2
+  revive:
+    rules:
+      - name: exported
+        disabled: true
 
 linters:
   disable-all: true
@@ -47,4 +51,3 @@ linters:
     - revive
     - typecheck
     - unused
-

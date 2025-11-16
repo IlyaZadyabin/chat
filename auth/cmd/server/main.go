@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -57,7 +58,11 @@ func main() {
 	serviceProvider := app.NewServiceProvider()
 
 	dbClient := serviceProvider.GetDbClient(context.Background())
-	defer dbClient.Close()
+	defer func() {
+		if err := dbClient.Close(); err != nil {
+			log.Printf("failed to close database connection: %v", err)
+		}
+	}()
 
 	userHandler := serviceProvider.GetUserHandler(context.Background())
 	authHandler := serviceProvider.GetAuthHandler(context.Background())
@@ -149,8 +154,17 @@ func runHTTPServer(grpcAddr, httpAddr string) error {
 		AllowCredentials: true,
 	})
 
+	httpServer := &http.Server{
+		Addr:              httpAddr,
+		Handler:           corsMiddleware.Handler(mux),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
 	log.Printf("Auth HTTP gateway listening on %s", httpAddr)
-	return http.ListenAndServe(httpAddr, corsMiddleware.Handler(mux))
+	return httpServer.ListenAndServe()
 }
 
 func runSwaggerServer(addr string) error {
@@ -170,7 +184,11 @@ func runSwaggerServer(addr string) error {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				log.Printf("failed to close swagger file: %v", err)
+			}
+		}()
 
 		content, err := io.ReadAll(file)
 		if err != nil {
@@ -188,9 +206,18 @@ func runSwaggerServer(addr string) error {
 		log.Printf("Successfully served swagger file")
 	})
 
+	swaggerServer := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
 	log.Printf("Auth Swagger server listening on %s", addr)
 	log.Printf("Visit http://%s to view the Swagger UI", addr)
-	return http.ListenAndServe(addr, mux)
+	return swaggerServer.ListenAndServe()
 }
 
 func getCore(level zap.AtomicLevel) zapcore.Core {
@@ -233,8 +260,12 @@ func runPrometheusServer(addr string) error {
 	mux.Handle("/metrics", promhttp.Handler())
 
 	prometheusServer := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	log.Printf("Auth Prometheus server listening on %s", addr)

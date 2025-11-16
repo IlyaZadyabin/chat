@@ -1,6 +1,6 @@
 include docker-compose.env
 export
-	
+
 LOCAL_BIN:=$(CURDIR)/bin
 
 # Database
@@ -36,10 +36,10 @@ local-migration-chat:
 
 # Linter commands
 install-golangci-lint:
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
 lint:
-	$(LOCAL_BIN)/golangci-lint run ./... --config .golangci.pipeline.yaml
+	$(LOCAL_BIN)/golangci-lint run ./... --config .golangci.yml
 
 # Testing
 .PHONY: test
@@ -59,3 +59,4 @@ test-coverage:
 	@echo "Combined coverage summary:"
 	@go tool cover -func=./coverage.out | grep "total" || echo "No coverage data found"
 	@grep -sqFx "/coverage.out" .gitignore || echo "/coverage.out" >> .gitignore
+

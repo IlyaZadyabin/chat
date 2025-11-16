@@ -90,3 +90,10 @@ grpcurl -d '{"login":"bob","password":"secret"}' \
 ---
 
 That’s it – spin up Postgres, run migrations, and start each Go service.
+
+## Monitoring
+
+- Run `docker compose up prometheus grafana` from the repo root to start Prometheus and Grafana
+- Prometheus scrapes the auth service on `host.docker.internal:2112` using `auth/prometheus.yml`.
+- Grafana auto-loads a datasource pointing at Prometheus and ships with an `Auth Service Overview` dashboard (`http://localhost:3000`, login `admin/admin`).
+- Dashboard JSON and provisioning files live under `auth/grafana/` if you want to tweak or extend the shipped panels.

@@ -25,7 +25,11 @@ func main() {
 	serviceProvider := app.NewServiceProvider()
 
 	dbClient := serviceProvider.GetDbClient(context.Background())
-	defer dbClient.Close()
+	defer func() {
+		if err := dbClient.Close(); err != nil {
+			log.Printf("failed to close database connection: %v", err)
+		}
+	}()
 
 	chatHandler := serviceProvider.GetChatHandler(context.Background())
 	authInterceptor := serviceProvider.GetAuthInterceptor()

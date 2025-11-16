@@ -1,6 +1,6 @@
 module chat
 
-go 1.23.0
+go 1.24.1
 
 replace common => ./common
 

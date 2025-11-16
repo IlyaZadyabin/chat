@@ -27,4 +27,3 @@ func MetricsInterceptor(ctx context.Context, req interface{}, info *grpc.UnarySe
 
 	return res, err
 }
-
