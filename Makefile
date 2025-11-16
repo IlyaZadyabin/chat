@@ -1,4 +1,3 @@
-include docker-compose.env
 export
 
 LOCAL_BIN:=$(CURDIR)/bin
@@ -59,4 +58,5 @@ test-coverage:
 	@echo "Combined coverage summary:"
 	@go tool cover -func=./coverage.out | grep "total" || echo "No coverage data found"
 	@grep -sqFx "/coverage.out" .gitignore || echo "/coverage.out" >> .gitignore
+
 

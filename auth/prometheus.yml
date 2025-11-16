@@ -9,5 +9,6 @@ scrape_configs:
 
   - job_name: "auth-service"
     static_configs:
-      - targets: [ "host.docker.internal:2112" ]
+      - targets: [ "auth-service:2112" ]
+
 

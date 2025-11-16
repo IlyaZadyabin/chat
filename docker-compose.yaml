@@ -8,8 +8,6 @@ services:
   auth-db:
     image: postgres:14-alpine3.17
     container_name: auth-db
-    env_file:
-      - docker-compose.env
     environment:
       - POSTGRES_DB=${AUTH_POSTGRES_DB}
       - POSTGRES_USER=${AUTH_POSTGRES_USER}
@@ -27,8 +25,6 @@ services:
   chat-db:
     image: postgres:14-alpine3.17
     container_name: chat-db
-    env_file:
-      - docker-compose.env
     environment:
       - POSTGRES_DB=${CHAT_POSTGRES_DB}
       - POSTGRES_USER=${CHAT_POSTGRES_USER}
@@ -43,9 +39,50 @@ services:
       timeout: 5s
       retries: 5
 
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth/Dockerfile
+    container_name: auth-service
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    ports:
+      - "${AUTH_GRPC_PORT}:${AUTH_GRPC_PORT}"
+      - "${AUTH_HTTP_PORT}:${AUTH_HTTP_PORT}"
+      - "${AUTH_SWAGGER_PORT}:${AUTH_SWAGGER_PORT}"
+      - "${AUTH_METRICS_PORT}:${AUTH_METRICS_PORT}"
+    environment:
+      - PG_HOST=auth-db
+      - PG_PORT=5432
+      - METRICS_HOST=0.0.0.0
+    networks:
+      - default
+
+  chat-service:
+    build:
+      context: .
+      dockerfile: chat_server/Dockerfile
+    container_name: chat-service
+    depends_on:
+      chat-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    ports:
+      - "${CHAT_GRPC_PORT}:${CHAT_GRPC_PORT}"
+    environment:
+      - PG_HOST=chat-db
+      - PG_PORT=5432
+      - AUTH_SERVICE_ADDR=auth-service:${AUTH_GRPC_PORT}
+    networks:
+      - default
+
   prometheus:
     image: prom/prometheus:v2.37.9
     container_name: prometheus
+    depends_on:
+      - auth-service
     ports:
       - "9090:9090"
     volumes:
