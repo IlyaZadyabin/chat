@@ -110,4 +110,15 @@ make compose-down
 
 Generate gRPC stubs in your preferred language from the `.proto` files or use `grpcurl`, e.g.:
 
+```bash
+grpcurl -d '{"login":"bob","password":"secret"}' \\
+  -plaintext localhost:50051 user_v1.UserService/CreateUser
 ```
+
+---
+
+## Monitoring
+
+- Prometheus scrapes the auth service on `auth-service:2112` (inside the Compose network) using `auth/prometheus.yml`.
+- Grafana auto-loads a datasource pointing at Prometheus and ships with an `Auth Service Overview` dashboard (`http://localhost:3000`, login `admin/admin`).
+- Dashboard JSON and provisioning files live under `auth/grafana/` if you want to tweak or extend the shipped panels.
