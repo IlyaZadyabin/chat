@@ -3,17 +3,25 @@ package tests
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/gojuno/minimock/v3"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	api "chat/auth/internal/api/user_v1"
+	"chat/auth/internal/logger"
 	"chat/auth/internal/model"
 	"chat/auth/internal/service"
 	serviceMocks "chat/auth/internal/service/mocks"
 	desc "chat/auth/pkg/user_v1"
 )
+
+func TestMain(m *testing.M) {
+	logger.Init(zapcore.NewNopCore())
+	os.Exit(m.Run())
+}
 
 func TestCreate(t *testing.T) {
 	t.Parallel()
