@@ -2,14 +2,55 @@
 
 A gRPC backend split into two independent Go services:
 
-1. **auth** – user registration / authentication
-2. **chat_server** – chat rooms & messaging
+1.  **auth** – user registration / authentication
+2.  **chat_server** – chat rooms & messaging
 
 Each service owns its own PostgreSQL database and is exposed via gRPC with protobuf contracts located under `*/api/*/*.proto`.
 
+## Architecture
+
+The following diagram illustrates the communication flow between the services:
+
+```mermaid
+graph TD
+    subgraph "Chat Client"
+        direction LR
+        CC_CLI["Client Application"]
+    end
+
+    subgraph "Auth Service"
+        direction TB
+        AS_User_API["User API <br/>(Create, Get, Update, Delete)"]
+        AS_Auth_API["Auth API <br/>(Login, GetAccessToken, GetRefreshToken)"]
+        AS_Access_API["Access API <br/>(Check)"]
+    end
+
+    subgraph "Chat Service"
+        direction TB
+        CS_Interceptor["Auth Interceptor"]
+        CS_Chat_API["Chat API <br/>(Create, Delete, SendMessage)"]
+    end
+
+    %% Client -> Auth Service Flows
+    CC_CLI -- "Create User, Get User, etc." --> AS_User_API
+    CC_CLI -- "Login" --> AS_Auth_API
+    CC_CLI -- "Get Access/Refresh Tokens" --> AS_Auth_API
+
+    %% Client -> Chat Service Flows (Intercepted)
+    CC_CLI -- "Create" --> CS_Interceptor
+    CC_CLI -- "Delete" --> CS_Interceptor
+    CC_CLI -- "SendMessage" --> CS_Interceptor
+
+    %% Chat Service -> Auth Service Flow
+    CS_Interceptor -- "Check token & permissions" --> AS_Access_API
+
+    %% Internal Chat Service Flow
+    CS_Interceptor -- "If valid, forwards request" --> CS_Chat_API
+```
+
 ## Tech Stack
 
-- Go 1.22
+- Go 1.24
 - gRPC + Protocol Buffers
 - PostgreSQL
 - `goose` for SQL migrations (invoked via Makefiles)
@@ -69,15 +110,4 @@ make compose-down
 
 Generate gRPC stubs in your preferred language from the `.proto` files or use `grpcurl`, e.g.:
 
-```bash
-grpcurl -d '{"login":"bob","password":"secret"}' \
-  -plaintext localhost:50051 user_v1.UserService/CreateUser
 ```
-
----
-
-## Monitoring
-
-- Prometheus scrapes the auth service on `auth-service:2112` (inside the Compose network) using `auth/prometheus.yml`.
-- Grafana auto-loads a datasource pointing at Prometheus and ships with an `Auth Service Overview` dashboard (`http://localhost:3000`, login `admin/admin`).
-- Dashboard JSON and provisioning files live under `auth/grafana/` if you want to tweak or extend the shipped panels.
